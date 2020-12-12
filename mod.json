@@ -1,0 +1,11 @@
+{
+    "Name": "HVT",
+    "Description": "High Value Target (HVT) Game Mode",
+    "Version": "1.0.0",
+    "HasVeniceEXT": true,
+    "HasWebUI": false,
+    "Tags": [ "TeamHVT", "HVT", "High Value Target" ],
+    "Dependencies": {
+        "veniceext": "^1.0.0"
+    }
+}
