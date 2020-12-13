@@ -4,7 +4,7 @@
     "Version": "1.0.0",
     "HasVeniceEXT": true,
     "HasWebUI": false,
-    "Tags": [ "TeamHVT", "HVT", "High Value Target" ],
+    "Tags": [ "team-hvt", "hvt", "high-value-target" ],
     "Dependencies": {
         "veniceext": "^1.0.0"
     }

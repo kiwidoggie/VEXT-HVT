@@ -30,6 +30,7 @@ function HVTEngine:__init()
     self.m_PlayerKilledEvent = Events:Subscribe("Player:Killed", self, self.OnPlayerKilled)
     self.m_PlayerCreatedEvent = Events:Subscribe("Player:Created", self, self.OnPlayerCreated)
     self.m_UpdateEvent = Events:Subscribe("Engine:Update", self, self.OnEngineUpdate)
+    self.m_PlayerChatEvent = Events:Subscribe("Player:Chat", self, self.OnPlayerChat)
 
     -- Hooks
     self.m_OnSoldierDamageHook = Hooks:Install("Soldier:Damage", 1, self, self.OnSoldierDamage)
@@ -41,6 +42,14 @@ function HVTEngine:__init()
     self.m_GameState = GameStates.GS_None
     self.m_GameStateTick = 0.0
     self.m_GameStateMaxTick = Options.Server_GameStateUpdateMaxTime
+
+    -- Warmup update timers
+    self.m_WarmupUpdateTick = 0.0
+    self.m_WarmupUpdateTickMax = Options.Server_GameStateUpdateMaxTime
+
+    -- Warmup delay timers
+    self.m_WarmupDelayTick= 0.0
+    self.m_WarmupDelayTickMax = Options.HVT_MaxWarmupTime
     
     -- Hvt Update Timers
     self.m_HvtUpdateTick = 0.0
@@ -55,7 +64,7 @@ function HVTEngine:__init()
     self.m_GameOverTickMax = Options.HVT_MaxGameOverTime
 
     -- Enable debug logging which will slow down shit
-    self.m_Debug = false
+    self.m_Debug = true
 end
 --[[
     This is called when the HVTEngine is being garbage collected
@@ -147,6 +156,16 @@ function HVTEngine:OnEngineUpdate(p_DeltaTime, p_SimulationDeltaTime)
     end
 end
 
+function HVTEngine:OnPlayerChat(p_Player, p_RecipientMask, p_Message)
+    -- Enable overriding game state based on chat
+    if self.m_Debug then
+        if p_Message == "!warmup" then
+            self:ChangeState(GameStates.GS_Warmup)
+        end
+    end
+
+end
+
 --[[
     Helper function which sends all clients the current hvt player id information
 
@@ -179,13 +198,23 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
     if self.m_GameState == GameStates.GS_None then
         return
     elseif self.m_GameState == GameStates.GS_Warmup then
-        -- TODO: Run the warmup game logic
-        -- 1. Wait for correct amount of players
-        -- 2. When the condition is met calculate who will be HVT
-        -- and who will be in that squad
-        -- 3. Force kill and respawn everyone, promoting the HVT to squad leader
-        -- as well as swapping all of the character models for this squad
-        -- giving the HVT the health boost
+        self.m_WarmupUpdateTick = self.m_WarmupUpdateTick + p_DeltaTime
+        if self.m_WarmupUpdateTick >= self.m_WarmupUpdateTickMax then
+            -- TODO: Run the warmup game logic
+            -- 1. Wait for correct amount of players
+            -- 2. When the condition is met calculate who will be HVT
+            -- and who will be in that squad
+            -- 3. Force kill and respawn everyone, promoting the HVT to squad leader
+            -- as well as swapping all of the character models for this squad
+            -- giving the HVT the health boost
+            if self.m_TeamManager:HasEnoughPlayers() then
+                -- TODO: Select the HVT
+                -- TODO: Select their squad
+                -- TODO: Shift teams
+                -- Kill all players
+                -- Spawn everyone
+            end
+        end
     elseif self.m_GameState == GameStates.GS_Running then
         -- TODO: Implement running game state
         self.m_RunningUpdateTick = self.m_RunningUpdateTick + p_DeltaTime
@@ -193,10 +222,7 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
             -- We have reached end of time, HVT wins
 
             -- Transfer over to the game over state
-            self.m_GameState = GameStates.GS_GameOver
-
-            -- Broadcast this change to all clients in the server
-            NetEvents:Broadcast("HVT:GameStateChanged", self.m_GameState)
+            self:ChangeState(GameStates.GS_GameOver)
         end
 
     elseif self.m_GameState == GameStates.GS_GameOver then
@@ -205,10 +231,7 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
         if self.m_GameOverTick >= self.m_GameOverTickMax then
 
             -- Transfer over to warmup game state
-            self.m_GameState = GameStates.GS_Warmup
-
-            -- Broadcast the game state change to all connected clients
-            NetEvents:Broadcast("HVT:GameStateChanged", self.m_GameState)
+            self:ChangeState(GameStates.GS_Warmup)
         end
     end
 end
@@ -268,5 +291,21 @@ function HVTEngine:UpdatePlayerHVTInfo(p_Player)
 
 end
 
+function HVTEngine:ChangeState(p_GameState)
+    if p_GameState < GameStates.GS_None then
+        return
+    end
+
+    if p_GameState > GameStates.GS_COUNT then
+        return
+    end
+
+    -- Transfer over to warmup game state
+    self.m_GameState = p_GameState
+
+    -- Broadcast the game state change to all connected clients
+    NetEvents:Broadcast("HVT:GameStateChanged", self.m_GameState)
+    
+end
 
 return HVTEngine

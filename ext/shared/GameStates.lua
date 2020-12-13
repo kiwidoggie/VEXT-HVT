@@ -1,8 +1,8 @@
 GameStates = {
-    GS_Warmup = 0,
-    GS_Selection = 1,
-    GS_Running = 2,
-    GS_GameOver = 3,
-    GS_None = 4,
+    GS_None = 0,
+    GS_Warmup = 1,
+    GS_Selection = 2,
+    GS_Running = 3,
+    GS_GameOver = 4,
     GS_COUNT = 5,
 }
