@@ -1,5 +1,7 @@
 class "HVTServer"
 
+require ("__shared/Options")
+
 local HVTEngine = require("Engine")
 
 function HVTServer:__init()
@@ -43,7 +45,7 @@ function HVTServer:SetupVariables()
         ["vars.roundStartPlayerCount"] = "0",
         ["vars.roundRestartPlayerCount"] = "0",
         ["vars.hud"] = "false",
-        ["vu.SquadSize"] = "5"
+        ["vu.SquadSize"] = tostring(Options.HVT_SquadSize)
     }
 
     -- Iterate through all of the commands and set their values via rcon

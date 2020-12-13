@@ -34,7 +34,9 @@ function HVTEngine:__init()
 
     -- Hooks
     self.m_OnSoldierDamageHook = Hooks:Install("Soldier:Damage", 1, self, self.OnSoldierDamage)
-    
+    self.m_OnPlayerSelectTeamHook = Hooks:Install("Player:SelectTeam", 1, self, self.OnPlayerSelectTeam)
+    self.m_OnPlayerFindBestSquad = Hooks:Install("Player:FindBestSquad", 1, self, self.OnPlayerFindBestSquad)
+
     -- Team management
     self.m_TeamManager = HVTTeamManager()
 
@@ -81,10 +83,12 @@ function HVTEngine:__gc()
     self.m_PlayerKilledEvent:Unsubscribe()
     self.m_PlayerCreatedEvent:Unsubscribe()
     self.m_UpdateEvent:Unsubscribe()
+    self.m_PlayerChatEvent:Unsubscribe()
 
     -- Uninstall all hooks
     self.m_OnSoldierDamageHook:Uninstall()
-
+    self.m_OnPlayerFindBestSquad:Uninstall()
+    self.m_OnPlayerSelectTeamHook:Uninstall()
 end
 
 --[[
@@ -208,6 +212,9 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
             -- as well as swapping all of the character models for this squad
             -- giving the HVT the health boost
             if self.m_TeamManager:HasEnoughPlayers() then
+
+                -- Force all lone wolves into a squad
+                self.m_TeamManager:ForceLoneWolvesIntoSquads()
                 -- TODO: Select the HVT
                 -- TODO: Select their squad
                 -- TODO: Shift teams
@@ -261,7 +268,26 @@ function HVTEngine:OnSoldierDamage(p_Hook, p_Soldier, p_Info, p_GiverInfo)
     end
 end
 
-function HVTEngine:StartNewGame()
+--[[
+    Finds the best new team for a player
+]]
+function HVTEngine:OnPlayerSelectTeam(p_Hook, p_Player, p_Team)
+    p_Team = self.m_TeamManager:FindTeamForNewPlayer()
+    if self.m_Debug then
+        print("player (" .. p_Player.name .. ") assigned to team: " .. p_Team)
+    end
+end
+
+--[[
+    Finds the best squad for a player
+]]--
+function HVTEngine:OnPlayerFindBestSquad(p_Hook, p_Player)
+    local s_SquadId = self.m_TeamManager:FindOpenSquad(p_Player.teamId)
+    if s_SquadId == SquadId.SquadNone then
+        s_SquadId = self.m_TeamManager:FindEmptySquad(p_Player.teamId)
+    end
+
+    return s_SquadId
 end
 
 function HVTEngine:UpdatePlayerGameState(p_Player)

@@ -20,6 +20,9 @@ Options = {
     -- Maximum time to wait after all players are ready and the game starting
     HVT_MaxWarmupTime = 5.0,
 
+    -- Squad size in the HVT game mode
+    HVT_SquadSize = 5,
+
     -- Server update rates
 
     -- Max interval to send updates to players updates about hvt
