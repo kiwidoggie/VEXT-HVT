@@ -38,7 +38,7 @@ function HVTEngine:__init()
     self.m_OnPlayerFindBestSquad = Hooks:Install("Player:FindBestSquad", 1, self, self.OnPlayerFindBestSquad)
 
     -- Team management
-    self.m_TeamManager = HVTTeamManager()
+    self.m_TeamManager = HVTTeamManager(self)
 
     -- Game state
     self.m_GameState = GameStates.GS_None
@@ -204,6 +204,8 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
     elseif self.m_GameState == GameStates.GS_Warmup then
         self.m_WarmupUpdateTick = self.m_WarmupUpdateTick + p_DeltaTime
         if self.m_WarmupUpdateTick >= self.m_WarmupUpdateTickMax then
+            self.m_WarmupUpdateTick = 0.0
+
             -- TODO: Run the warmup game logic
             -- 1. Wait for correct amount of players
             -- 2. When the condition is met calculate who will be HVT
@@ -215,11 +217,42 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
 
                 -- Force all lone wolves into a squad
                 self.m_TeamManager:ForceLoneWolvesIntoSquads()
-                -- TODO: Select the HVT
-                -- TODO: Select their squad
-                -- TODO: Shift teams
+
+                -- Fix the teams and squads
+                self.m_TeamManager:Balance()
+
+                -- Select the HVT
+                self.m_TeamManager:SetupHVT()
+
+
                 -- Kill all players
+                -- NOTE: I don't think below is needed because all players are killed/spawning disabled in TeamManager:Balance()
+                --[[
+                    local s_Players = PlayerManager:GetPlayers()
+                for _, l_Player in ipairs(s_Players) do
+                    if l_Player == nil then
+                        goto __kill_everyone_cont__
+                    end
+
+                    if not l_Player.alive then
+                        goto __kill_everyone_cont__
+                    end
+
+                    local l_Soldier = l_Player.soldier
+                    if l_Soldier == nil then
+                        goto __kill_everyone_cont__
+                    end
+
+                    l_Soldier:Kill()
+                    ::__kill_everyone_cont__::
+                end
+                ]]--
+
+
                 -- Spawn everyone
+
+                -- Update the gamestate
+                self:ChangeState(GameStates.GS_Running)
             end
         end
     elseif self.m_GameState == GameStates.GS_Running then
@@ -236,6 +269,7 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
         -- TODO: Update the game over game state
         self.m_GameOverTick = self.m_GameOverTick + p_DeltaTime
         if self.m_GameOverTick >= self.m_GameOverTickMax then
+            ChatManager:Yell("Game Over")
 
             -- Transfer over to warmup game state
             self:ChangeState(GameStates.GS_Warmup)
@@ -332,6 +366,15 @@ function HVTEngine:ChangeState(p_GameState)
     -- Broadcast the game state change to all connected clients
     NetEvents:Broadcast("HVT:GameStateChanged", self.m_GameState)
     
+end
+
+function HVTEngine:EndGame()
+    -- TODO: Handle ending the game
+
+    -- This should take in the winning team
+    -- Was the hvt killed or did time run out
+    -- Start waiting the game over for a bit
+    -- Prepare the gameover to re-transition into the warmup
 end
 
 return HVTEngine

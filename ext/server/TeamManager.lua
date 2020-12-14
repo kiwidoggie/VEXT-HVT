@@ -1,6 +1,9 @@
 class "HVTTeamManager"
 
-function HVTTeamManager:__init()
+function HVTTeamManager:__init(p_Engine)
+    -- Reference to the main engine
+    self.m_Engine = p_Engine
+
     -- These should be changable if needed
     self.m_DefenceTeam = TeamId.Team1
     self.m_AttackTeam = TeamId.Team2
@@ -372,6 +375,8 @@ function HVTTeamManager:SetupHVT()
 
         ::__setup_hvt_enable_spawn__::
     end
+
+    ChatManager:SendMessage(s_Player.name .. " is the HVT!")
 end
 
 --[[
@@ -442,11 +447,119 @@ function HVTTeamManager:FindVictimToMoveToHVT()
     return s_VictimPlayerId
 end
 
-function HVTTeamManager:SmartBalance()
+function HVTTeamManager:Balance()
     -- We are starting with players from all different squads/team arrangements
 
     -- Start with the player count, if we can split down the middle it's easiest, otherwise we give the attackers +1
-    
+
+    -- First we will iterate all players and kill them if they are alive, and disable the ability to spawn
+    local s_Players = PlayerManager:GetPlayers()
+    for l_Index, l_Player in ipairs(s_Players) do
+        -- Validate the player
+        if l_Player == nil then
+            goto __smart_balance_kill_cont__
+        end
+
+        -- Disable players ability to spawn
+        l_Player.isAllowedToSpawn = false
+
+        -- If the player is already dead skip killing them
+        if not l_Player.alive then
+            goto __smart_balance_kill_cont__
+        end
+
+        -- Get the soldier
+        local l_Soldier = l_Player.soldier
+        if l_Soldier == nil then
+            goto __smart_balance_kill_cont__
+        end
+
+        -- Kill the soldier
+        l_Soldier:Kill()
+
+        ::__smart_balance_kill_cont__::
+    end
+
+    local s_PlayerCount = #s_Players
+    if s_PlayerCount < 2 then
+        if self.m_Debug then
+            print("not enough players to start.")
+        end
+        return
+    end
+
+    local s_StopCount = #s_Players / 2
+
+    -- Randomize teams
+    for l_Index, l_Player in ipairs(s_Players) do
+        if l_Player == nil then
+            goto __smart_balance_randomize_cont__
+        end
+
+        if l_Index < s_StopCount then
+            l_Player.teamId = self.m_AttackTeam
+        else
+            l_Player.teamId = self.m_DefenceTeam
+        end
+        
+        ::__smart_balance_randomize_cont__::
+    end
+
+    -- Assign squads for attackers
+    local s_AttackPlayers = PlayerManager:GetPlayersByTeam(self.m_AttackTeam)
+    local s_CurrentSquadCount = 0
+    local s_CurrentSquad = SquadId.Squad1
+
+    for _, l_Player in pairs(s_AttackPlayers) do
+        if l_Player == nil then
+            goto __smart_balance_squad_cont__
+        end
+
+        l_Player.squadId = s_CurrentSquad
+
+        -- If this is the first person in the squad, set leader
+        if s_CurrentSquadCount == 0 then
+            l_Player:SetSquadLeader(true, false)
+        end
+
+        s_CurrentSquadCount = s_CurrentSquadCount + 1
+
+        if s_CurrentSquadCount >= Options.HVT_SquadSize then
+            s_CurrentSquadCount = 0
+            s_CurrentSquad = s_CurrentSquad + 1
+        end
+        ::__smart_balance_squad_cont__::
+    end
+
+    -- Assign squads for defence
+    local s_DefencePlayers = PlayerManager:GetPlayersByTeam(self.m_DefenceTeam)
+    s_CurrentSquadCount = 0
+    s_CurrentSquad = SquadId.Squad1
+
+    for _, l_Player in pairs(s_DefencePlayers) do
+        if l_Player == nil then
+            goto __smart_balance_squad_def_cont__
+        end
+
+        -- Update the players squad id
+        l_Player.squadId = s_CurrentSquad
+
+        -- If this is the first person in the squad, set leader
+        if s_CurrentSquadCount == 0 then
+            l_Player:SetSquadLeader(true, false)
+        end
+
+        -- Increase to the next squad
+        s_CurrentSquadCount = s_CurrentSquadCount + 1
+
+        --
+        if s_CurrentSquadCount >= Options.HVT_SquadSize then
+            s_CurrentSquadCount = 0
+            s_CurrentSquad = s_CurrentSquad + 1
+        end
+
+        ::__smart_balance_squad_def_cont__::
+    end
 end
 
 return HVTTeamManager
