@@ -17,6 +17,7 @@ class "HVTEngine"
 -- Include shared objects
 require ("__shared/GameStates")
 require ("__shared/Options")
+require ("__shared/EndGameReason")
 
 -- Include our team manager class
 local HVTTeamManager = require("TeamManager")
@@ -260,16 +261,22 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
         self.m_RunningUpdateTick = self.m_RunningUpdateTick + p_DeltaTime
         if self.m_RunningUpdateTick >= self.m_RunningUpdateTickMax then
             -- We have reached end of time, HVT wins
+            
 
             -- Transfer over to the game over state
             self:ChangeState(GameStates.GS_GameOver)
         end
 
     elseif self.m_GameState == GameStates.GS_GameOver then
-        -- TODO: Update the game over game state
+        -- If this is the first tick of gameover, send the stats to users
+        if self.m_GameOverTick == 0.0 then
+            ChatManager:Yell("Game Over")
+        end
+
+        -- Update the game over game state, this just waits a period of time before swithcing back to warmup
         self.m_GameOverTick = self.m_GameOverTick + p_DeltaTime
         if self.m_GameOverTick >= self.m_GameOverTickMax then
-            ChatManager:Yell("Game Over")
+            
 
             -- Transfer over to warmup game state
             self:ChangeState(GameStates.GS_Warmup)
@@ -324,33 +331,6 @@ function HVTEngine:OnPlayerFindBestSquad(p_Hook, p_Player)
     return s_SquadId
 end
 
-function HVTEngine:UpdatePlayerGameState(p_Player)
-    if p_Player == nil then
-        print("Attempted to update invalid player's gamestate.")
-        return
-    end
-
-    --[[
-
-        We need to detemrine what game data we need to sync to the client every second
-
-        1. HVT Location
-        2. HVT Armor Level
-        3. Current GameState
-        4. Gift Cooldown Time
-        5. Current Gift
-        6. Defender Count
-        7. Attacker Count
-    ]]--
-end
-
-function HVTEngine:UpdatePlayerHVTInfo(p_Player)
-    if p_Player == nil then
-        return
-    end
-
-end
-
 function HVTEngine:ChangeState(p_GameState)
     if p_GameState < GameStates.GS_None then
         return
@@ -360,21 +340,66 @@ function HVTEngine:ChangeState(p_GameState)
         return
     end
 
+    if self.m_Debug then
+        print("Transition from GS: " .. self.m_GameState .. " to " .. p_GameState)
+    end
+
     -- Transfer over to warmup game state
     self.m_GameState = p_GameState
 
     -- Broadcast the game state change to all connected clients
     NetEvents:Broadcast("HVT:GameStateChanged", self.m_GameState)
-    
 end
 
-function HVTEngine:EndGame()
-    -- TODO: Handle ending the game
+--[[
+    Handle ending the game for whatever reason
+]]--
+function HVTEngine:EndGame(p_EndGameReason, p_HvtPlayerId)
+    -- Validate the end game reason
+    if p_EndGameReason < EndGameReason.EGR_None or p_EndGameReason >= EndGameReason.EGR_COUNT then
+        if self.m_Debug then
+            print("invalid end game reason.")
+        end
 
-    -- This should take in the winning team
-    -- Was the hvt killed or did time run out
-    -- Start waiting the game over for a bit
+        return
+    end
+
+    -- If there isn't a valid hvt player then just return back to warmup
+    if p_HvtPlayerId == -1 then
+        if self.m_Debug then
+            print("end game called with invalid hvt player id.")
+        end
+
+        self:ChangeState(GameStates.GS_Warmup)
+        return
+    end
+
+    -- Get the HVT player
+    local s_HvtPlayer = PlayerManager:GetPlayerById(p_HvtPlayerId)
+
+    -- Validate the HVT player
+    if s_HvtPlayer == nil then
+        if self.m_Debug then
+            print("Could not get the provided hvt player by id.")
+        end
+
+        self:ChangeState(GameStates.GS_Warmup)
+        return
+    end
+    
+    -- This was admin or mod aborted, just reset everything back to normal
+    if p_EndGameReason == EndGameReason.EGR_None then
+        ChatManager:SendMessage("End Game Abort called.")
+    elseif p_EndGameReason == EndGameReason.EGR_HVTSurvived then
+        ChatManager:Yell("YOU WIN! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetDefenceTeam())
+        ChatManager:Yell("YOU LOSE! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetAttackTeam())
+    elseif p_EndGameReason == EndGameReason.EGR_HVTKilled then
+        ChatManager:Yell("YOU WIN! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetAttackTeam())
+        ChatManager:Yell("YOU LOSE! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetDefenceTeam())
+    end
+
     -- Prepare the gameover to re-transition into the warmup
+    self:ChangeState(GameStates.GS_Warmup)
 end
 
 return HVTEngine

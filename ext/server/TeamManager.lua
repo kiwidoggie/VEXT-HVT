@@ -149,6 +149,14 @@ function HVTTeamManager:GetSelectedHVTPlayerId()
     return self.m_SelectedHVTPlayerId
 end
 
+function HVTTeamManager:GetAttackTeam()
+    return self.m_AttackTeam
+end
+
+function HVTTeamManager:GetDefenceTeam()
+    return self.m_DefenceTeam
+end
+
 --[[
     Checks to see if there are enough players on each team to start the HVT game mode
 
