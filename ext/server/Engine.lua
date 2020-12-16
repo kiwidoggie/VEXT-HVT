@@ -38,9 +38,6 @@ function HVTEngine:__init()
     self.m_OnPlayerSelectTeamHook = Hooks:Install("Player:SelectTeam", 1, self, self.OnPlayerSelectTeam)
     self.m_OnPlayerFindBestSquad = Hooks:Install("Player:FindBestSquad", 1, self, self.OnPlayerFindBestSquad)
 
-    -- Team management
-    self.m_TeamManager = HVTTeamManager(self)
-
     -- Game state
     self.m_GameState = GameStates.GS_None
     self.m_GameStateTick = 0.0
@@ -68,6 +65,9 @@ function HVTEngine:__init()
 
     -- Enable debug logging which will slow down shit
     self.m_Debug = true
+
+    -- Team management
+    self.m_TeamManager = HVTTeamManager(self)
 end
 --[[
     This is called when the HVTEngine is being garbage collected
@@ -215,6 +215,8 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
             -- as well as swapping all of the character models for this squad
             -- giving the HVT the health boost
             if self.m_TeamManager:HasEnoughPlayers() then
+                -- Reset the team manager
+                self.m_TeamManager:Reset()
 
                 -- Force all lone wolves into a squad
                 self.m_TeamManager:ForceLoneWolvesIntoSquads()
@@ -225,32 +227,7 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
                 -- Select the HVT
                 self.m_TeamManager:SetupHVT()
 
-
-                -- Kill all players
-                -- NOTE: I don't think below is needed because all players are killed/spawning disabled in TeamManager:Balance()
-                --[[
-                    local s_Players = PlayerManager:GetPlayers()
-                for _, l_Player in ipairs(s_Players) do
-                    if l_Player == nil then
-                        goto __kill_everyone_cont__
-                    end
-
-                    if not l_Player.alive then
-                        goto __kill_everyone_cont__
-                    end
-
-                    local l_Soldier = l_Player.soldier
-                    if l_Soldier == nil then
-                        goto __kill_everyone_cont__
-                    end
-
-                    l_Soldier:Kill()
-                    ::__kill_everyone_cont__::
-                end
-                ]]--
-
-
-                -- Spawn everyone
+                -- TODO: Spawn everyone
 
                 -- Update the gamestate
                 self:ChangeState(GameStates.GS_Running)
@@ -398,8 +375,15 @@ function HVTEngine:EndGame(p_EndGameReason, p_HvtPlayerId)
         ChatManager:Yell("YOU LOSE! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetDefenceTeam())
     end
 
+    -- Reset the team manager
+    self.m_TeamManager:Reset()
+
     -- Prepare the gameover to re-transition into the warmup
     self:ChangeState(GameStates.GS_Warmup)
+end
+
+function HVTEngine:IsDebug()
+    return self.m_Debug
 end
 
 return HVTEngine

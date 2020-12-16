@@ -13,7 +13,9 @@ function HVTTeamManager:__init(p_Engine)
     self.m_SelectedHVTPlayerId = -1
 
     -- Configurable options
-    
+    self.m_Debug = self.m_Engine:IsDebug()
+
+    print("self isdebug: " .. tostring(self.m_Debug))
 end
 
 function HVTTeamManager:__gc()
@@ -29,9 +31,15 @@ function HVTTeamManager:OnPlayerLeft(p_Player)
     -- Get the player id
     local s_LeavingPlayerId = p_Player.id
 
-    -- TODO: If the leaving player was the HVT, end the game
+    -- If the leaving player was the HVT, end the game
     if s_LeavingPlayerId == self.m_SelectedHVTPlayerId then
-        -- TODO: Reset the game mode, give loss to the defense
+        -- Debug logging
+        if self.m_Debug then
+            print("HVT has left, ending the game.")
+        end
+
+        -- Reset the game mode, give loss to the defense
+        self.m_Engine:EndGame(EndGameReason.EGR_HVTKilled, -1)
         return
     end
 
@@ -88,13 +96,27 @@ function HVTTeamManager:OnPlayerLeft(p_Player)
 
 end
 
+--[[
+    Handler for the player killed event from VeniceEXT
+
+    This will handle the logic of seeing if the HVT has been killed,
+    or if a defender was killed and needs to be switched to another team
+
+    Or if an attacker was killed remove the ability to spawn
+]]--
 function HVTTeamManager:OnPlayerKilled(p_Player, p_Inflictor, p_Position, p_Weapon, p_IsRoadKill, p_IsHeadShot, p_WasVictimInReviveState, p_Info)
     if p_Player == nil then
         return
     end
 
+    print(p_Inflictor)
+
     -- Check if the player killed was the HVT
     if p_Player.id == self.m_SelectedHVTPlayerId then
+        if self.m_Debug then
+            print("HVT has been killed, ending the game")
+        end
+
         -- Send notification to the losing team
         ChatManager:Yell("HVT has been killed, YOU LOSE!", self.m_DefenceTeam)
         
@@ -106,11 +128,18 @@ function HVTTeamManager:OnPlayerKilled(p_Player, p_Inflictor, p_Position, p_Weap
             ChatManager:SendMessage(p_Inflictor.name .. " executed the HVT with a " .. p_Weapon .. "!")
         end
     
-        -- TODO: End the game
+        -- End the game
+        self.m_Engine:EndGame(EndGameReason.EGR_HVTKilled, p_Player.id)
+
+        return
     end
 
     -- If someone on the defense dies, switch their team to the attackers
     if p_Player.teamId == self.m_DefenceTeam then
+        if self.m_Debug then
+            print("Defender " .. p_Player.name .. " has died, switching to attacking team.")
+        end
+
         -- Change the player team to attacker
         p_Player.teamId = self.m_AttackTeam
 
@@ -119,6 +148,10 @@ function HVTTeamManager:OnPlayerKilled(p_Player, p_Inflictor, p_Position, p_Weap
 
         -- Find a target squad
         local s_TargetSquad = self:FindOpenSquad(self.m_AttackTeam)
+
+        if self.m_Debug then
+            print(p_Player.name .. " new attacker squad: " .. tostring(s_TargetSquad))
+        end
         
         -- If no open squad has been found, create new squad
         if s_TargetSquad == SquadId.SquadNone then
@@ -127,13 +160,24 @@ function HVTTeamManager:OnPlayerKilled(p_Player, p_Inflictor, p_Position, p_Weap
             -- Otherwise we assign the target squad
             p_Player.squadId = s_TargetSquad
         end
+
+        -- Allow the newly switched attacker to spawn again
+        p_Player.isAllowedToSpawn = true
     else
+        if self.m_Debug then
+            print("Player " .. p_Player.name .. " has died on the attacking team, preventing spawning.")
+        end
+
         -- If someone dies on the attacker team prevent them from respawning
         p_Player.isAllowedToSpawn = false
     end
 end
 
 function HVTTeamManager:OnPlayerCreated(p_Player)
+    -- TODO: Do we want to disable the players ability to spawn?
+    if self.m_Debug then
+        print("Player " .. p_Player.name .. " has been created.")
+    end
 end
 
 --[[
@@ -496,18 +540,28 @@ function HVTTeamManager:Balance()
         return
     end
 
-    local s_StopCount = #s_Players / 2
-
     -- Randomize teams
     for l_Index, l_Player in ipairs(s_Players) do
         if l_Player == nil then
             goto __smart_balance_randomize_cont__
         end
 
-        if l_Index < s_StopCount then
+        print("l_Index: " .. tostring(l_Index))
+
+        if math.fmod(l_Index + 1, 2) == 0 then
             l_Player.teamId = self.m_AttackTeam
+            l_Player.squadId = SquadId.SquadNone
+
+            if self.m_Debug then
+                print("moving " .. l_Player.name .. " to Team" .. self.m_AttackTeam)
+            end
         else
             l_Player.teamId = self.m_DefenceTeam
+            l_Player.squadId = SquadId.SquadNone
+
+            if self.m_Debug then
+                print("moving " .. l_Player.name .. " to Team" .. self.m_DefenceTeam)
+            end
         end
         
         ::__smart_balance_randomize_cont__::
@@ -524,6 +578,10 @@ function HVTTeamManager:Balance()
         end
 
         l_Player.squadId = s_CurrentSquad
+        
+        if self.m_Debug then
+            print(l_Player.name .. " assigned to squad: " .. s_CurrentSquad)
+        end
 
         -- If this is the first person in the squad, set leader
         if s_CurrentSquadCount == 0 then
@@ -552,6 +610,10 @@ function HVTTeamManager:Balance()
         -- Update the players squad id
         l_Player.squadId = s_CurrentSquad
 
+        if self.m_Debug then
+            print(l_Player.name .. " assigned to squad: " .. s_CurrentSquad)
+        end
+
         -- If this is the first person in the squad, set leader
         if s_CurrentSquadCount == 0 then
             l_Player:SetSquadLeader(true, false)
@@ -569,5 +631,11 @@ function HVTTeamManager:Balance()
         ::__smart_balance_squad_def_cont__::
     end
 end
+
+function HVTTeamManager:Reset()
+    self.m_SelectedHVTSquadId = TeamId.SquadNone
+    self.m_SelectedHVTPlayerId = -1
+end
+
 
 return HVTTeamManager

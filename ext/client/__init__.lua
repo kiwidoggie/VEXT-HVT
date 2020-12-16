@@ -109,7 +109,7 @@ function HVTClient:OnUiDrawHud()
     local s_DebugColor = Vec4(0, 1, 0, 1)
 
     DebugRenderer:DrawText2D(10, 10, "GameState: " .. self.m_GameState, s_DebugColor, 1.0)
-    DebugRenderer:DrawText2D(10, 20, "HVT: " .. self.m_HvtPlayerId .. "Armor: " .. self.m_HvtArmor, s_DebugColor, 1.0)
+    DebugRenderer:DrawText2D(10, 20, "HVT: " .. self.m_HvtPlayerId .. " Armor: " .. self.m_HvtArmor, s_DebugColor, 1.0)
     DebugRenderer:DrawText2D(10, 30, "Pos: " .. self.m_HvtLastPosition.x .. ", " .. self.m_HvtLastPosition.y .. ", " .. self.m_HvtLastPosition.z, s_DebugColor, 1.0)
     
     -- Check to make sure we have a valid player id
@@ -129,7 +129,7 @@ function HVTClient:OnUiDrawHud()
     local s_ScreenPosition = ClientUtils:WorldToScreen(self.m_HvtLastPosition)
 
     -- Draw our always visible text
-    DebugRenderer:DrawText2D(s_ScreenPosition.x, s_ScreenPosition.y, "HVT (" .. self.m_HvtArmor .. "/100)", s_Color, 0.5)
+    DebugRenderer:DrawText2D(s_ScreenPosition.x, s_ScreenPosition.y, "HVT (" .. self.m_HvtArmor .. "/100)", s_Color, 0.80)
 
 end
 
