@@ -115,10 +115,12 @@ end
     Handles the player killed event
 ]]-- 
 function HVTEngine:OnPlayerKilled(p_Player, p_Inflictor, p_Position, p_Weapon, p_IsRoadKill, p_IsHeadShot, p_WasVictimInReviveState, p_Info)
+    -- Validate the player
     if p_Player == nil then
         return
     end
 
+    -- Validate the inflictor that gave the damage
     if p_Inflictor == nil then
         return
     end
@@ -131,6 +133,8 @@ end
     Handles when a new player is created (once per game?)
 
     TODO: Determine if the assumption that this is only fired once when the player joins the game holds true
+
+    NOTE: This holds true for bots as well
 ]]--
 function HVTEngine:OnPlayerCreated(p_Player)
     -- Validate player
@@ -138,9 +142,14 @@ function HVTEngine:OnPlayerCreated(p_Player)
         return
     end
 
+    -- Forward this event to the team manager
     self.m_TeamManager:OnPlayerCreated(p_Player)
 end
 
+--[[
+    Event callback for the frostbite engine update
+
+]]--
 function HVTEngine:OnEngineUpdate(p_DeltaTime, p_SimulationDeltaTime)
     -- HVT Update information to all clients
     self.m_HvtUpdateTick = self.m_HvtUpdateTick + p_DeltaTime
@@ -161,6 +170,9 @@ function HVTEngine:OnEngineUpdate(p_DeltaTime, p_SimulationDeltaTime)
     end
 end
 
+--[[
+    Callback for when a player sends a chat message
+]]--
 function HVTEngine:OnPlayerChat(p_Player, p_RecipientMask, p_Message)
     -- Enable overriding game state based on chat
     if self.m_Debug then
@@ -199,6 +211,11 @@ function HVTEngine:OnHvtUpdate()
     end
 end
 
+--[[
+    This function gets called periodicaly in order to update the current HVT game state
+    
+    This will handle any of the "logic" of each of the game states
+]]
 function HVTEngine:OnGameStateUpdate(p_DeltaTime)
     if self.m_GameState == GameStates.GS_None then
         return
@@ -207,7 +224,7 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
         if self.m_WarmupUpdateTick >= self.m_WarmupUpdateTickMax then
             self.m_WarmupUpdateTick = 0.0
 
-            -- TODO: Run the warmup game logic
+            -- Run the warmup game logic
             -- 1. Wait for correct amount of players
             -- 2. When the condition is met calculate who will be HVT
             -- and who will be in that squad
@@ -234,14 +251,11 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
             end
         end
     elseif self.m_GameState == GameStates.GS_Running then
-        -- TODO: Implement running game state
+        -- Running game state
         self.m_RunningUpdateTick = self.m_RunningUpdateTick + p_DeltaTime
         if self.m_RunningUpdateTick >= self.m_RunningUpdateTickMax then
             -- We have reached end of time, HVT wins
-            
-
-            -- Transfer over to the game over state
-            self:ChangeState(GameStates.GS_GameOver)
+            self:EndGame(EndGameReason.EGR_HVTSurvived, self.m_TeamManager:GetSelectedHVTPlayerId())
         end
 
     elseif self.m_GameState == GameStates.GS_GameOver then
@@ -253,8 +267,6 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
         -- Update the game over game state, this just waits a period of time before swithcing back to warmup
         self.m_GameOverTick = self.m_GameOverTick + p_DeltaTime
         if self.m_GameOverTick >= self.m_GameOverTickMax then
-            
-
             -- Transfer over to warmup game state
             self:ChangeState(GameStates.GS_Warmup)
         end
@@ -308,6 +320,11 @@ function HVTEngine:OnPlayerFindBestSquad(p_Hook, p_Player)
     return s_SquadId
 end
 
+--[[
+    Helper function in order to change game states
+
+    This will validate the destination game state as well as do some debug logging if enabled
+]]--
 function HVTEngine:ChangeState(p_GameState)
     if p_GameState < GameStates.GS_None then
         return
@@ -347,7 +364,7 @@ function HVTEngine:EndGame(p_EndGameReason, p_HvtPlayerId)
             print("end game called with invalid hvt player id.")
         end
 
-        self:ChangeState(GameStates.GS_Warmup)
+        self:ChangeState(GameStates.GS_GameOver)
         return
     end
 
@@ -360,7 +377,7 @@ function HVTEngine:EndGame(p_EndGameReason, p_HvtPlayerId)
             print("Could not get the provided hvt player by id.")
         end
 
-        self:ChangeState(GameStates.GS_Warmup)
+        self:ChangeState(GameStates.GS_GameOver)
         return
     end
     
@@ -379,9 +396,14 @@ function HVTEngine:EndGame(p_EndGameReason, p_HvtPlayerId)
     self.m_TeamManager:Reset()
 
     -- Prepare the gameover to re-transition into the warmup
-    self:ChangeState(GameStates.GS_Warmup)
+    self:ChangeState(GameStates.GS_GameOver)
 end
 
+--[[
+    Helper function to determine if the HVTEngine is running in debug mode or not
+
+    Returns boolean, true if debug mode is enabled, false otherwise
+]]
 function HVTEngine:IsDebug()
     return self.m_Debug
 end

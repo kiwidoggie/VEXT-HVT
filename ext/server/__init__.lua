@@ -17,6 +17,12 @@ function HVTServer:__gc()
     self.m_LevelLoadedEvent:Unsubscribe()
 end
 
+--[[
+    Callback for the level loaded event
+
+    This is used so we can set all of the RCON variables for this game mode manually
+    so we don't have to rely on an admin to do it
+]]-- 
 function HVTServer:OnLevelLoaded(p_LevelName, p_GameMode, p_Round, p_RoundsPerMap)
     print("Loading: " .. p_LevelName .. " GameMode: " .. p_GameMode)
 
@@ -28,6 +34,7 @@ end
     Sets up the needed server configuration via rcon
 ]]--
 function HVTServer:SetupVariables()
+    -- Hold a dictionary of all of the variables we want to change
     local s_VariablePair = {
         ["vars.friendlyFire"] = "true",
         ["vars.soldierHealth"] = "100",

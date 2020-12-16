@@ -22,6 +22,15 @@ function HVTTeamManager:__gc()
     -- TODO: Cleanup anything that needs to be
 end
 
+--[[
+    Handler for the event where a player is leaving
+
+    This will determine if the player leaving is the HVT (and end the game)
+
+    If the player leaving was within the same squad as the HVT find another alive player to replace them
+
+    If a attacker is leaving do nothing
+]]--
 function HVTTeamManager:OnPlayerLeft(p_Player)
     -- Validate player
     if p_Player == nil then
@@ -189,14 +198,29 @@ function HVTTeamManager:GetSelectedHVTSquadId()
     return self.m_SelectedHVTSquadId
 end
 
+--[[
+    Helper function get the selected HVT player id
+    
+    Returns int player id
+]]--
 function HVTTeamManager:GetSelectedHVTPlayerId()
     return self.m_SelectedHVTPlayerId
 end
 
+--[[
+    Gets the attacking TeamId
+
+    Returns TeamId
+]]--
 function HVTTeamManager:GetAttackTeam()
     return self.m_AttackTeam
 end
 
+--[[
+    Gets the defending TeamId
+
+    Returns TeamId
+]]--
 function HVTTeamManager:GetDefenceTeam()
     return self.m_DefenceTeam
 end
@@ -263,6 +287,11 @@ function HVTTeamManager:FindFullSquad(p_TeamId, p_AcceptPartial)
     return s_FullSquads[s_RandomSquadIndex]
 end
 
+--[[
+    Helper function that finds an empty squad
+    
+    Returns SquadId, SquadNone on error/not found
+]]
 function HVTTeamManager:FindEmptySquad(p_TeamId)
     -- Validate our team id
     if p_TeamId <= TeamId.TeamNeutral or p_TeamId >= TeamId.TeamIdCount then
@@ -281,6 +310,11 @@ function HVTTeamManager:FindEmptySquad(p_TeamId)
     return SquadId.SquadNone
 end
 
+--[[
+    Helper function to find a new team for an incoming player
+    
+    Returns TeamId
+]]--
 function HVTTeamManager:FindTeamForNewPlayer()
     -- Get the amount of defence people left
     local s_DefenceCount = PlayerManager:GetPlayersByTeam(self.m_DefenceTeam)
@@ -499,6 +533,9 @@ function HVTTeamManager:FindVictimToMoveToHVT()
     return s_VictimPlayerId
 end
 
+--[[
+    This scrambles/balances teams to start a new HVT game mode
+]]--
 function HVTTeamManager:Balance()
     -- We are starting with players from all different squads/team arrangements
 
@@ -532,6 +569,7 @@ function HVTTeamManager:Balance()
         ::__smart_balance_kill_cont__::
     end
 
+    -- Check the total amount of players
     local s_PlayerCount = #s_Players
     if s_PlayerCount < 2 then
         if self.m_Debug then
@@ -632,6 +670,11 @@ function HVTTeamManager:Balance()
     end
 end
 
+--[[
+    Resets the team manager to a default state
+
+    This will clear out the HVT and the HVT Squad
+]]--
 function HVTTeamManager:Reset()
     self.m_SelectedHVTSquadId = TeamId.SquadNone
     self.m_SelectedHVTPlayerId = -1

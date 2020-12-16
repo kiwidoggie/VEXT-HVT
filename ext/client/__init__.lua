@@ -31,6 +31,9 @@ function HVTClient:__gc()
     self.m_UiDrawHudEvent:Unsubscribe()
 end
 
+--[[
+    NetEvent callback for when the game state changes
+]]--
 function HVTClient:OnGameStateChanged(p_GameState)
     if self.m_Debug then
         print("Game State changed to: " .. p_GameState)
@@ -38,10 +41,11 @@ function HVTClient:OnGameStateChanged(p_GameState)
 
     -- Update our game state
     self.m_GameState = p_GameState
-
-    -- TODO: Do any logic that you needed on a gamestate swap
 end
 
+--[[
+    NetEvent callback from the server to update the HVT information
+]]--
 function HVTClient:OnHvtInfoChanged(p_PlayerId)
     -- Debug information
     if self.m_Debug then
@@ -104,13 +108,20 @@ function HVTClient:OnHvtInfoChanged(p_PlayerId)
     self.m_HvtPlayerId = p_PlayerId
 end
 
+--[[
+    Callback for the ui draw event
+
+    This is where we put all of our drawing logic about the HVT
+]]--
 function HVTClient:OnUiDrawHud()
     -- Draw some debugging information
     local s_DebugColor = Vec4(0, 1, 0, 1)
 
-    DebugRenderer:DrawText2D(10, 10, "GameState: " .. self.m_GameState, s_DebugColor, 1.0)
-    DebugRenderer:DrawText2D(10, 20, "HVT: " .. self.m_HvtPlayerId .. " Armor: " .. self.m_HvtArmor, s_DebugColor, 1.0)
-    DebugRenderer:DrawText2D(10, 30, "Pos: " .. self.m_HvtLastPosition.x .. ", " .. self.m_HvtLastPosition.y .. ", " .. self.m_HvtLastPosition.z, s_DebugColor, 1.0)
+    if self.m_Debug then
+        DebugRenderer:DrawText2D(10, 10, "GameState: " .. self.m_GameState, s_DebugColor, 1.0)
+        DebugRenderer:DrawText2D(10, 20, "HVT: " .. self.m_HvtPlayerId .. " Armor: " .. self.m_HvtArmor, s_DebugColor, 1.0)
+        DebugRenderer:DrawText2D(10, 30, "Pos: " .. self.m_HvtLastPosition.x .. ", " .. self.m_HvtLastPosition.y .. ", " .. self.m_HvtLastPosition.z, s_DebugColor, 1.0)
+    end
     
     -- Check to make sure we have a valid player id
     if self.m_HvtPlayerId < 0 then
