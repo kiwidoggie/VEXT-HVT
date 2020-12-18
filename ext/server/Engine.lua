@@ -246,6 +246,50 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
 
                 -- TODO: Spawn everyone
 
+                -- TODO: Give the HVT more health
+
+                -- Get the HVT player ID
+                local s_HvtPlayerId = self.m_TeamManager:GetSelectedHVTPlayerId()
+                if s_HvtPlayerId == -1 then
+                    print("there was an error getting the hvt.")
+                    return
+                end
+
+                -- Get the HVT player
+                local s_HvtPlayer = PlayerManager:GetPlayerById(s_HvtPlayerId)
+                if s_HvtPlayer == nil then
+                    print("there was an error getting the hvt player.")
+                    return
+                end
+
+                -- Get the HVT soldier
+                local s_HvtSoldier = s_HvtPlayer.soldier
+                if s_HvtSoldier == nil then
+                    print("could not increase the hvt health.")
+                    return
+                end
+
+                -- Update the HVT health by +50, then again in the loop for the whole squad, this will give the HVT +75
+                s_HvtSoldier.health = s_HvtSoldier.health + 50.0
+
+                -- Give the HVT squad +25 health
+                local s_SquadPlayers = PlayerManager:GetPlayersBySquad(self.m_TeamManager:GetDefenceTeam(), s_HvtPlayer.squadId)
+                for _, l_SquadPlayer in pairs(s_SquadPlayers) do
+                    if l_SquadPlayer == nil then
+                        goto __squad_player_health_cont__
+                    end
+
+                    -- Get the squad soldier
+                    local s_SquadSoldier = l_SquadPlayer.soldier
+                    if s_SquadSoldier == nil then
+                        goto __squad_player_health_cont__
+                    end
+
+                    -- Give soldiers a bump of health
+                    s_SquadSoldier.health = s_SquadSoldier.health + 25.0
+                    ::__squad_player_health_cont__::
+                end
+
                 -- Update the gamestate
                 self:ChangeState(GameStates.GS_Running)
             end
@@ -254,19 +298,25 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
         -- Running game state
         self.m_RunningUpdateTick = self.m_RunningUpdateTick + p_DeltaTime
         if self.m_RunningUpdateTick >= self.m_RunningUpdateTickMax then
+            self.m_RunningUpdateTick = 0.0
+
             -- We have reached end of time, HVT wins
             self:EndGame(EndGameReason.EGR_HVTSurvived, self.m_TeamManager:GetSelectedHVTPlayerId())
         end
 
+        -- TODO: Check to see if all attacking players are dead, if they are end the game
+
     elseif self.m_GameState == GameStates.GS_GameOver then
         -- If this is the first tick of gameover, send the stats to users
         if self.m_GameOverTick == 0.0 then
-            ChatManager:Yell("Game Over")
+            ChatManager:Yell("Game Over", 3.0)
         end
 
         -- Update the game over game state, this just waits a period of time before swithcing back to warmup
         self.m_GameOverTick = self.m_GameOverTick + p_DeltaTime
         if self.m_GameOverTick >= self.m_GameOverTickMax then
+            self.m_GameOverTick = 0.0
+
             -- Transfer over to warmup game state
             self:ChangeState(GameStates.GS_Warmup)
         end

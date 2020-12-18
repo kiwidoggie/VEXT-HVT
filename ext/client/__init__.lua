@@ -128,6 +128,16 @@ function HVTClient:OnUiDrawHud()
         return
     end
 
+    -- Get the local player
+    local s_LocalPlayer = PlayerManager:GetLocalPlayer()
+    if s_LocalPlayer ~= nil then
+        -- Check to see if the local player is the HVT
+        if self.m_HvtPlayerId == s_LocalPlayer.id then
+            -- We do not want to draw the label for the player who is the HVT
+            return
+        end
+    end
+
     -- Calculate the colors
     local s_Green = (self.m_HvtArmor / 100.0)
     local s_Red = 1.0 - s_Green

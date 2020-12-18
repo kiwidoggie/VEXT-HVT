@@ -15,7 +15,7 @@ Options = {
     HVT_MaxRunTime = 300.0,
 
     -- Maximum time to stay in the game over time
-    HVT_MaxGameOverTime = 10.0,
+    HVT_MaxGameOverTime = 5.0,
 
     -- Maximum time to wait after all players are ready and the game starting
     HVT_MaxWarmupTime = 5.0,
@@ -26,7 +26,7 @@ Options = {
     -- Server update rates
 
     -- Max interval to send updates to players updates about hvt
-    Server_HvtUpdateMaxTime = 1.0,
+    Server_HvtUpdateMaxTime = 2.25,
 
     -- Max interval to run the warmup update logic
     Server_WarmupUpdateMaxTime = 0.50,
