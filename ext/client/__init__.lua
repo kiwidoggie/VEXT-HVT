@@ -11,6 +11,7 @@ function HVTClient:__init()
     self.m_UiDrawHudEvent = Events:Subscribe("UI:DrawHud", self, self.OnUiDrawHud)
 
     -- Server authoratative HVT information
+    self.m_HvtHealth = 0.0
     self.m_HvtArmor = 0.0
     self.m_HvtLastPosition = Vec3(0, 0, 0)
     self.m_HvtPlayerId = -1
@@ -46,7 +47,7 @@ end
 --[[
     NetEvent callback from the server to update the HVT information
 ]]--
-function HVTClient:OnHvtInfoChanged(p_PlayerId)
+function HVTClient:OnHvtInfoChanged(p_PlayerId, p_PlayerHealth)
     -- Debug information
     if self.m_Debug then
         print("OnHvtInfoChanged PlayerId: " .. p_PlayerId)
@@ -54,6 +55,7 @@ function HVTClient:OnHvtInfoChanged(p_PlayerId)
 
     -- This may be sent if there's no game going on, this means ignore
     if p_PlayerId == -1 then
+        self.m_HvtHealth = 0.0
         self.m_HvtArmor = 0.0
         self.m_HvtLastPosition = Vec3(0, 0, 0)
         self.m_HvtPlayerId = -1
@@ -103,6 +105,7 @@ function HVTClient:OnHvtInfoChanged(p_PlayerId)
     end
 
     -- Update our variable for other stuff to use it
+    self.m_HvtHealth = s_Health
     self.m_HvtArmor = s_Armor
     self.m_HvtLastPosition = s_Transform.trans
     self.m_HvtPlayerId = p_PlayerId
@@ -149,8 +152,14 @@ function HVTClient:OnUiDrawHud()
     -- Get the screen position based on the last hvt position
     local s_ScreenPosition = ClientUtils:WorldToScreen(self.m_HvtLastPosition)
 
+    -- CHeck to see if the screen position that we got back is valid
+    if s_ScreenPosition == nil then
+        return
+    end
+
     -- Draw our always visible text
-    DebugRenderer:DrawText2D(s_ScreenPosition.x, s_ScreenPosition.y, "HVT (" .. self.m_HvtArmor .. "/100)", s_Color, 0.80)
+    DebugRenderer:DrawText2D(s_ScreenPosition.x, s_ScreenPosition.y, "HVT", s_Color, 0.90)
+    --DebugRenderer:DrawText2D(s_ScreenPosition.x, s_ScreenPosition.y, "HVT", s_Color, 0.90)
 
 end
 

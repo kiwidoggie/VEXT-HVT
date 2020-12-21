@@ -208,12 +208,6 @@ function HVTEngine:OnLevelDestroy()
         print("Unloading all assets.")
     end
 
-    -- Reset all of our loadout stuff for this map
-    self.m_LoadoutManager:Reset()
-
-    -- Reset all of the team stuff
-    self.m_TeamManager:Reset()
-
     -- Reset our local variables
     self:Reset()
 end
@@ -249,6 +243,12 @@ function HVTEngine:Reset()
 
     -- MpSoldier
     self.m_MpSoldier = nil
+
+    -- Reset all of our loadout stuff for this map
+    self.m_LoadoutManager:Reset()
+
+    -- Reset all of the team stuff
+    self.m_TeamManager:Reset()
 end
 
 
@@ -345,6 +345,16 @@ function HVTEngine:OnHvtUpdate()
     -- Get the current selected HVT
     local s_HvtPlayerId = self.m_TeamManager:GetSelectedHVTPlayerId()
 
+    local s_HvtPlayerHealth = 0.0
+    local s_HvtPlayer = PlayerManager:GetPlayerById(s_HvtPlayerId)
+    if s_HvtPlayer ~= nil then
+        local s_HvtSoldier = s_HvtPlayer.soldier
+        if s_HvtSoldier ~= nil then
+            s_HvtPlayerHealth = s_HvtSoldier.health
+        end
+    end
+
+
     -- Iterate througha ll of the players sending them an update
     local s_Players = PlayerManager:GetPlayers()
     for l_Index, l_Player in ipairs(s_Players) do
@@ -358,7 +368,7 @@ function HVTEngine:OnHvtUpdate()
         end
 
         -- Send the HVT update event to the player
-        NetEvents:SendTo("HVT:HvtInfoChanged", l_Player, s_HvtPlayerId)
+        NetEvents:SendTo("HVT:HvtInfoChanged", l_Player, s_HvtPlayerId, s_HvtPlayerHealth)
 
         ::__hvt_update_cont__::
     end
