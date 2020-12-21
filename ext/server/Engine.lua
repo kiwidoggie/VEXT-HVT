@@ -22,6 +22,7 @@ require ("__shared/Utils")
 
 -- Include our team manager class
 local HVTTeamManager = require("TeamManager")
+local HVTLoadoutManager = require("LoadoutManager")
 
 --[[
     Initializes the HVT Engine
@@ -68,9 +69,6 @@ function HVTEngine:__init()
     -- Enable debug logging which will slow down shit
     self.m_Debug = true
 
-    -- Team management
-    self.m_TeamManager = HVTTeamManager(self)
-
     -- Spawn points
     self.m_SpawnPoints = { }
 
@@ -81,6 +79,12 @@ function HVTEngine:__init()
     self.m_Unlocks = { }
     self.m_AttackerVeniceSoldierCustomizations = { }
     self.m_DefenceVeniceSoldierCustomizations = { }
+
+    -- Team management
+    self.m_TeamManager = HVTTeamManager(self)
+
+    -- Loadout management and spawning
+    self.m_LoadoutManager = LoadoutManager(self)
 end
 --[[
     This is called when the HVTEngine is being garbage collected
@@ -202,12 +206,12 @@ function HVTEngine:ParseWorldPartData(p_WorldPartData)
     end
 
     -- Make sure we only have the TDM_Logic instance
-    if not string.match(s_WorldPartData.name, "TDM_Logic") then
+    if not string.match(p_WorldPartData.name, "TDM_Logic") then
         return
     end
 
     -- Get the objects
-    local s_WorldPartDataObjects = s_WorldPartData.objects
+    local s_WorldPartDataObjects = p_WorldPartData.objects
 
     -- Iterate through all of the WorldPartData objects
     for _, l_ObjectInstance in pairs(s_WorldPartDataObjects) do
@@ -234,10 +238,12 @@ function HVTEngine:ParseSoldierBlueprint(p_SoldierBlueprint)
         return
     end
 
+    print("soldier: " .. p_SoldierBlueprint.name)
+
     -- Check the soldier blueprint name
     if p_SoldierBlueprint.name == "Characters/Soldiers/MpSoldier" then
         if self.m_Debug then
-            print("MpSoldier Blueprint: " .. s_SoldierBlueprint.instanceGuid:ToString("N"))
+            print("MpSoldier Blueprint: " .. p_SoldierBlueprint.instanceGuid:ToString("N"))
         end
 
         -- Assign our mp soldier
@@ -257,6 +263,8 @@ function HVTEngine:OnPartitionLoaded(p_Partition)
         if l_Instance == nil then
             goto __instance_cont__
         end
+
+        self.m_LoadoutManager:OnInstanceLoaded(l_Instance)
 
         -- Check to make sure that the instance is a WorldPartData
         if l_Instance:Is("WorldPartData") then
@@ -381,7 +389,11 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
                     print("there was an error, there are no spawn points.")
                 end
 
-                -- TODO: Give the HVT more health
+                -- Validate the soldier ebx reference
+                if self.m_MpSoldier == nil then
+                    print("mp soldier not found.")
+                    return
+                end
 
                 -- Get the HVT player ID
                 local s_HvtPlayerId = self.m_TeamManager:GetSelectedHVTPlayerId()
@@ -390,40 +402,47 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
                     return
                 end
 
-                -- Get the HVT player
-                local s_HvtPlayer = PlayerManager:GetPlayerById(s_HvtPlayerId)
-                if s_HvtPlayer == nil then
-                    print("there was an error getting the hvt player.")
+                -- Get the HVT squad ID
+                local s_HvtSquadId = self.m_TeamManager:GetSelectedHVTSquadId()
+                if s_HvtSquadId == SquadId.SquadNone then
+                    print("err: invalid squad.")
                     return
                 end
 
-                -- Get the HVT soldier
-                local s_HvtSoldier = s_HvtPlayer.soldier
-                if s_HvtSoldier == nil then
-                    print("could not increase the hvt health.")
-                    return
-                end
+                -- Force spawn all players
+                for _, l_Player in pairs(PlayerManager:GetPlayers()) do
+                    local s_SpawnLocationIndex = MathUtils:GetRandomInt(1, #self.m_SpawnPoints)
 
-                -- Update the HVT health by +50, then again in the loop for the whole squad, this will give the HVT +75
-                s_HvtSoldier.health = s_HvtSoldier.health + 50.0
+                    local s_SpawnTransform = self.m_SpawnPoints[s_SpawnLocationIndex]
 
-                -- Give the HVT squad +25 health
-                local s_SquadPlayers = PlayerManager:GetPlayersBySquad(self.m_TeamManager:GetDefenceTeam(), s_HvtPlayer.squadId)
-                for _, l_SquadPlayer in pairs(s_SquadPlayers) do
-                    if l_SquadPlayer == nil then
-                        goto __squad_player_health_cont__
+                    local s_IsHvtSquad = s_HvtSquadId == l_Player.squadId
+                    local s_IsHvt = s_HvtPlayerId == l_Player.id
+
+                    -- p_Player, p_SoldierBlueprint, p_Transform, p_IsHvt, p_IsHvtSquad
+                    self.m_LoadoutManager:SpawnPlayer(l_Player, self.m_MpSoldier, s_SpawnTransform, s_IsHvt, s_IsHvtSquad)
+
+                    -- Get the soldier
+                    local s_Soldier = l_Player.soldier
+                    if s_Soldier == nil then
+                        if self.m_Debug then
+                            print("err: could not get the newly spawned player soldier.")
+                        end
+
+                        goto __warmup_spawn_player_cont__
                     end
 
-                    -- Get the squad soldier
-                    local s_SquadSoldier = l_SquadPlayer.soldier
-                    if s_SquadSoldier == nil then
-                        goto __squad_player_health_cont__
+                    -- If the player is in the HVT squad then give them a +50 boost
+                    if s_IsHvtSquad then
+                        s_Soldier.health = s_Soldier.health + 50.0
                     end
 
-                    -- Give soldiers a bump of health
-                    s_SquadSoldier.health = s_SquadSoldier.health + 25.0
-                    ::__squad_player_health_cont__::
-                end
+                    -- If the player is also the HVT, then give a +25
+                    if s_IsHvt then
+                        s_Soldier.health = s_Soldier.health + 25.0
+                    end
+                    
+                    ::__warmup_spawn_player_cont__::
+                end       
 
                 -- Update the gamestate
                 self:ChangeState(GameStates.GS_Running)
@@ -456,6 +475,18 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
             self:ChangeState(GameStates.GS_Warmup)
         end
     end
+end
+
+function HVTEngine:SpawnPlayer(p_Player, p_Transform)
+    if p_Player == nil then
+        return
+    end
+
+    if p_Player.alive then
+        return
+    end
+
+
 end
 
 --[[

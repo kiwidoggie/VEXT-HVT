@@ -23,6 +23,11 @@ Options = {
     -- Squad size in the HVT game mode
     HVT_SquadSize = 5,
 
+    -- Set our default attack and defence teams
+    HVT_AttackTeam = TeamId.Team1,
+    
+    HVT_DefenceTeam = TeamId.Team2,
+
     -- Server update rates
 
     -- Max interval to send updates to players updates about hvt

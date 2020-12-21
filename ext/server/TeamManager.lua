@@ -1,12 +1,14 @@
 class "HVTTeamManager"
 
+require ("__shared/Options")
+
 function HVTTeamManager:__init(p_Engine)
     -- Reference to the main engine
     self.m_Engine = p_Engine
 
     -- These should be changable if needed
-    self.m_DefenceTeam = TeamId.Team1
-    self.m_AttackTeam = TeamId.Team2
+    self.m_DefenceTeam = Options.HVT_DefenceTeam
+    self.m_AttackTeam = Options.HVT_AttackTeam
 
     -- The squad that has been selected as HVT for this game mode
     self.m_SelectedHVTSquadId = TeamId.SquadNone
