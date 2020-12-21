@@ -129,10 +129,10 @@ function HVTTeamManager:OnPlayerKilled(p_Player, p_Inflictor, p_Position, p_Weap
         end
 
         -- Send notification to the losing team
-        ChatManager:Yell("HVT has been killed, YOU LOSE!", self.m_DefenceTeam)
+        ChatManager:Yell("HVT has been killed, YOU LOSE!", 2.0, self.m_DefenceTeam)
         
         -- Send notification to the winning team
-        ChatManager:Yell("HVT has been executed, YOU WIN!", self.m_AttackTeam)
+        ChatManager:Yell("HVT has been executed, YOU WIN!", 2.0, self.m_AttackTeam)
         
         if p_Inflictor ~= nil then
             -- Announce to the entire server

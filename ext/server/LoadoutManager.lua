@@ -138,7 +138,7 @@ function LoadoutManager:SpawnPlayer(p_Player, p_SoldierBlueprint, p_Transform, p
             print("err: invalid player.")
         end
 
-        return
+        return nil
     end
 
     -- Validate the blueprint
@@ -147,7 +147,7 @@ function LoadoutManager:SpawnPlayer(p_Player, p_SoldierBlueprint, p_Transform, p
             print("err: invalid soldier blueprint.")
         end
 
-        return
+        return nil
     end
 
     -- Check if the player is alive
@@ -155,24 +155,24 @@ function LoadoutManager:SpawnPlayer(p_Player, p_SoldierBlueprint, p_Transform, p
         if self.m_Engine:IsDebug() then
             print("warn: skipping spawning player (" .. p_Player.name .. ") because they are alive.")
         end
-        return
+        return nil
     end
 
     -- Get and validate the knife unlock
     local s_KnifeUnlock = self:GetWeaponUnlockByName("Weapons/Knife/U_Knife")
     if s_KnifeUnlock == nil then
         print("err: knife unlock not found.")
-        return
+        return nil
     end
 
     -- Get the M416 with acog and silencer
     local s_M416Unlock = self:GetWeaponUnlockByName("Weapons/M416/U_M416")
     if s_M416Unlock == nil then
         print("err: m416 unlock not found.")
-        return
+        return nil
     end
 
-    local s_M416AcogUnlock = self:GetWeaponUnlockByName("Weapons/M416/U_M416_ACOG")
+    --[[local s_M416AcogUnlock = self:GetWeaponUnlockByName("Weapons/M416/U_M416_ACOG")
     if s_M416AcogUnlock == nil then
         print("err: m416 acog unlock not found.")
         return
@@ -182,16 +182,16 @@ function LoadoutManager:SpawnPlayer(p_Player, p_SoldierBlueprint, p_Transform, p
     if s_M416SilencerUnlock == nil then
         print("err: m416 silencer unlock not found.")
         return
-    end
+    end]]--
 
     local s_G17Silenced = self:GetWeaponUnlockByName("Weapons/Glock17/U_Glock17_Silenced")
     if s_G17Silenced == nil then
         print("err: g17 silenced unlock not found.")
-        return
+        return nil
     end
 
     -- Set the weapon slots
-    p_Player:SelectWeapon(WeaponSlot.WeaponSlot_0, s_M416Unlock, { s_M416AcogUnlock, s_M416SilencerUnlock } )
+    p_Player:SelectWeapon(WeaponSlot.WeaponSlot_0, s_M416Unlock, { --[[s_M416AcogUnlock, s_M416SilencerUnlock]] } )
     p_Player:SelectWeapon(WeaponSlot.WeaponSlot_1, s_G17Silenced, { } )
 
     -- Set our knife slot
@@ -227,13 +227,13 @@ function LoadoutManager:SpawnPlayer(p_Player, p_SoldierBlueprint, p_Transform, p
     -- Validate the appearance
     if s_Appearance == nil then
         print("err: invalid appearance.")
-        return
+        return nil
     end
 
     -- Validate the soldier asset
     if s_SoldierAsset == nil then
         print("err: invalid soldier asset.")
-        return
+        return nil
     end
 
     -- Set the unlocks
@@ -243,11 +243,13 @@ function LoadoutManager:SpawnPlayer(p_Player, p_SoldierBlueprint, p_Transform, p
     local s_Soldier = p_Player:CreateSoldier(p_SoldierBlueprint, p_Transform)
     if s_Soldier == nil then
         print("err: failed to create player soldier.")
-        return
+        return nil
     end
 
     -- Spawn the soldier
     p_Player:SpawnSoldierAt(s_Soldier, p_Transform, CharacterPoseType.CharacterPoseType_Stand)
+
+    return s_Soldier
 end
 
 return LoadoutManager

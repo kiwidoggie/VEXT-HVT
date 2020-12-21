@@ -35,6 +35,8 @@ function HVTEngine:__init()
     self.m_UpdateEvent = Events:Subscribe("Engine:Update", self, self.OnEngineUpdate)
     self.m_PlayerChatEvent = Events:Subscribe("Player:Chat", self, self.OnPlayerChat)
     self.m_PartitionLoadedEvent = Events:Subscribe("Partition:Loaded", self, self.OnPartitionLoaded)
+    self.m_LevelLoadedEvent = Events:Subscribe("Level:Loaded", self, self.OnLevelLoaded)
+    self.m_LevelDestroyEvent = Events:Subscribe("Level:Destroy", self, self.OnLevelDestroy)
 
     -- Hooks
     self.m_OnSoldierDamageHook = Hooks:Install("Soldier:Damage", 1, self, self.OnSoldierDamage)
@@ -42,7 +44,7 @@ function HVTEngine:__init()
     self.m_OnPlayerFindBestSquad = Hooks:Install("Player:FindBestSquad", 1, self, self.OnPlayerFindBestSquad)
 
     -- Game state
-    self.m_GameState = GameStates.GS_None
+    self.m_GameState = GameStates.GS_Warmup
     self.m_GameStateTick = 0.0
     self.m_GameStateMaxTick = Options.Server_GameStateUpdateMaxTime
 
@@ -75,11 +77,6 @@ function HVTEngine:__init()
     -- MpSoldier
     self.m_MpSoldier = nil
 
-    -- Unlocks
-    self.m_Unlocks = { }
-    self.m_AttackerVeniceSoldierCustomizations = { }
-    self.m_DefenceVeniceSoldierCustomizations = { }
-
     -- Team management
     self.m_TeamManager = HVTTeamManager(self)
 
@@ -102,6 +99,9 @@ function HVTEngine:__gc()
     self.m_PlayerCreatedEvent:Unsubscribe()
     self.m_UpdateEvent:Unsubscribe()
     self.m_PlayerChatEvent:Unsubscribe()
+    self.m_PartitionLoadedEvent:Unsubscribe()
+    self.m_LevelLoadedEvent:Unsubscribe()
+    self.m_LevelDestroyEvent:Unsubscribe()
 
     -- Uninstall all hooks
     self.m_OnSoldierDamageHook:Uninstall()
@@ -200,6 +200,58 @@ function HVTEngine:OnPlayerChat(p_Player, p_RecipientMask, p_Message)
 
 end
 
+function HVTEngine:OnLevelLoaded(p_LevelName, p_GameMode, p_Round, p_RoundsPerMap)
+end
+
+function HVTEngine:OnLevelDestroy()
+    if self.m_Debug then
+        print("Unloading all assets.")
+    end
+
+    -- Reset all of our loadout stuff for this map
+    self.m_LoadoutManager:Reset()
+
+    -- Reset all of the team stuff
+    self.m_TeamManager:Reset()
+
+    -- Reset our local variables
+    self:Reset()
+end
+
+function HVTEngine:Reset()
+    -- Game state
+    self.m_GameState = GameStates.GS_Warmup
+    self.m_GameStateTick = 0.0
+    self.m_GameStateMaxTick = Options.Server_GameStateUpdateMaxTime
+
+    -- Warmup update timers
+    self.m_WarmupUpdateTick = 0.0
+    self.m_WarmupUpdateTickMax = Options.Server_GameStateUpdateMaxTime
+
+    -- Warmup delay timers
+    self.m_WarmupDelayTick= 0.0
+    self.m_WarmupDelayTickMax = Options.HVT_MaxWarmupTime
+    
+    -- Hvt Update Timers
+    self.m_HvtUpdateTick = 0.0
+    self.m_HvtUpdateTickMax = Options.Server_HvtUpdateMaxTime
+
+    -- Running update timers
+    self.m_RunningUpdateTick = 0.0
+    self.m_RunningUpdateTickMax = Options.HVT_MaxRunTime
+
+    -- Game over update timers
+    self.m_GameOverTick = 0.0
+    self.m_GameOverTickMax = Options.HVT_MaxGameOverTime
+
+    -- Spawn points
+    self.m_SpawnPoints = { }
+
+    -- MpSoldier
+    self.m_MpSoldier = nil
+end
+
+
 function HVTEngine:ParseWorldPartData(p_WorldPartData)
     if p_WorldPartData == nil then
         return
@@ -278,46 +330,7 @@ function HVTEngine:OnPartitionLoaded(p_Partition)
             local s_SoldierBlueprint = SoldierBlueprint(l_Instance)
 
             self:ParseSoldierBlueprint(s_SoldierBlueprint)
-        end
-
-        -- Get the weapon unlocks
-        if l_Instance:Is("SoldierWeaponUnlockAsset") then
-            local s_WeaponUnlockAsset = SoldierWeaponUnlockAsset(l_Instance)
-
-            if self.m_Debug then
-                print("Unlock: " .. s_WeaponUnlockAsset.name)
-            end
-
-            table.insert(self.m_Unlocks, s_WeaponUnlockAsset)
-        end
-
-        -- Unlock assets for each team
-        if l_Instance:Is("VeniceSoldierCustomizationAsset") then
-            local s_CustomizationAsset = VeniceSoldierCustomizationAsset(l_Instance)
-
-            -- Get the asset name
-            local s_AssetName = s_CustomizationAsset.name
-
-            -- Check to see which team this is from
-            local s_IsUs = Utils.contains(s_AssetName, "/US")
-            local s_IsRu = Utils.contains(s_AssetName, "/RU")
-
-            if s_IsUs and s_IsRu then
-                print("Unlock cannot be us and ru...")
-            end
-
-            if not s_IsUs and not s_IsRu then
-                print("Unlock can not be neither US or RU.")
-            end
-
-            -- Add to the list
-            if s_IsUs then
-                table.insert(self.m_AttackerVeniceSoldierCustomizations, s_CustomizationAsset)
-            elseif s_IsRu then
-                table.insert(self.m_DefenceVeniceSoldierCustomizations, s_CustomizationAsset)
-            end
-        end
-        
+        end        
 
         ::__instance_cont__::
     end
@@ -417,6 +430,11 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
 
                     local s_IsHvtSquad = s_HvtSquadId == l_Player.squadId
                     local s_IsHvt = s_HvtPlayerId == l_Player.id
+
+                    if self.m_MpSoldier == nil then
+                        print("Something is partially broken, mp soldier not found, manually assigning...")
+                        self.m_MpSoldier = ResourceManager:SearchForInstanceByGuid(Guid('261E43BF-259B-41D2-BF3B-9AE4DDA96AD2'))
+                    end
 
                     -- p_Player, p_SoldierBlueprint, p_Transform, p_IsHvt, p_IsHvtSquad
                     self.m_LoadoutManager:SpawnPlayer(l_Player, self.m_MpSoldier, s_SpawnTransform, s_IsHvt, s_IsHvtSquad)
@@ -604,8 +622,8 @@ function HVTEngine:EndGame(p_EndGameReason, p_HvtPlayerId)
         ChatManager:Yell("YOU WIN! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetDefenceTeam())
         ChatManager:Yell("YOU LOSE! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetAttackTeam())
     elseif p_EndGameReason == EndGameReason.EGR_HVTKilled then
-        ChatManager:Yell("YOU WIN! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetAttackTeam())
-        ChatManager:Yell("YOU LOSE! " .. s_HvtPlayer.name .. " survived with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetDefenceTeam())
+        ChatManager:Yell("YOU WIN! " .. s_HvtPlayer.name .. " died with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetAttackTeam())
+        ChatManager:Yell("YOU LOSE! " .. s_HvtPlayer.name .. " died with " .. tostring(s_HvtPlayer.kills) .. " kills!", 2.0, self.m_TeamManager:GetDefenceTeam())
     end
 
     -- Reset the team manager
