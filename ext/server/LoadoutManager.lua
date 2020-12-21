@@ -35,6 +35,12 @@ function LoadoutManager:__init(p_Engine)
     self.m_DefenceSoldierName = "Gameplay/Kits/USEngineer"    
 end
 
+function LoadoutManager:Reset()
+    self.m_WeaponUnlocks = { }
+    self.m_SoldierAssets = { }
+    self.m_AppearanceAssets = { }
+end
+
 function LoadoutManager:OnInstanceLoaded(p_Instance)
     -- Validate the instance
     if p_Instance == nil then
