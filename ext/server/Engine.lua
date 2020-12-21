@@ -18,6 +18,7 @@ class "HVTEngine"
 require ("__shared/GameStates")
 require ("__shared/Options")
 require ("__shared/EndGameReason")
+require ("__shared/Utils")
 
 -- Include our team manager class
 local HVTTeamManager = require("TeamManager")
@@ -32,6 +33,7 @@ function HVTEngine:__init()
     self.m_PlayerCreatedEvent = Events:Subscribe("Player:Created", self, self.OnPlayerCreated)
     self.m_UpdateEvent = Events:Subscribe("Engine:Update", self, self.OnEngineUpdate)
     self.m_PlayerChatEvent = Events:Subscribe("Player:Chat", self, self.OnPlayerChat)
+    self.m_PartitionLoadedEvent = Events:Subscribe("Partition:Loaded", self, self.OnPartitionLoaded)
 
     -- Hooks
     self.m_OnSoldierDamageHook = Hooks:Install("Soldier:Damage", 1, self, self.OnSoldierDamage)
@@ -68,6 +70,17 @@ function HVTEngine:__init()
 
     -- Team management
     self.m_TeamManager = HVTTeamManager(self)
+
+    -- Spawn points
+    self.m_SpawnPoints = { }
+
+    -- MpSoldier
+    self.m_MpSoldier = nil
+
+    -- Unlocks
+    self.m_Unlocks = { }
+    self.m_AttackerVeniceSoldierCustomizations = { }
+    self.m_DefenceVeniceSoldierCustomizations = { }
 end
 --[[
     This is called when the HVTEngine is being garbage collected
@@ -183,6 +196,125 @@ function HVTEngine:OnPlayerChat(p_Player, p_RecipientMask, p_Message)
 
 end
 
+function HVTEngine:ParseWorldPartData(p_WorldPartData)
+    if p_WorldPartData == nil then
+        return
+    end
+
+    -- Make sure we only have the TDM_Logic instance
+    if not string.match(s_WorldPartData.name, "TDM_Logic") then
+        return
+    end
+
+    -- Get the objects
+    local s_WorldPartDataObjects = s_WorldPartData.objects
+
+    -- Iterate through all of the WorldPartData objects
+    for _, l_ObjectInstance in pairs(s_WorldPartDataObjects) do
+        -- Ensure that we only get AlternateSpawnEntityData
+        if l_ObjectInstance:Is("AlternateSpawnEntityData") then
+            local s_AlternateSpawnEntityData = AlternateSpawnEntityData(l_ObjectInstance)
+
+            -- Get the transform
+            local s_Transform = s_AlternateSpawnEntityData.transform
+
+            -- Add the LinearTransform to a list for later
+            table.insert(self.m_SpawnPoints, s_Transform)
+
+            if self.m_Debug then
+                print("Found Spawn Point At: (" .. s_Transform.trans.x .. ", " .. s_Transform.trans.y .. ", " .. s_Transform.trans.z .. ")")
+            end
+        end
+    end
+end
+
+function HVTEngine:ParseSoldierBlueprint(p_SoldierBlueprint)
+    -- Validate the soldier blueprint
+    if p_SoldierBlueprint == nil then
+        return
+    end
+
+    -- Check the soldier blueprint name
+    if p_SoldierBlueprint.name == "Characters/Soldiers/MpSoldier" then
+        if self.m_Debug then
+            print("MpSoldier Blueprint: " .. s_SoldierBlueprint.instanceGuid:ToString("N"))
+        end
+
+        -- Assign our mp soldier
+        self.m_MpSoldier = p_SoldierBlueprint
+    end
+end
+
+function HVTEngine:OnPartitionLoaded(p_Partition)
+    -- Validate the partition
+    if p_Partition == nil then
+        return
+    end
+
+    -- Iterate all of instances
+    local s_Instances = p_Partition.instances
+    for _, l_Instance in pairs(s_Instances) do
+        if l_Instance == nil then
+            goto __instance_cont__
+        end
+
+        -- Check to make sure that the instance is a WorldPartData
+        if l_Instance:Is("WorldPartData") then
+            local s_WorldPartData = WorldPartData(l_Instance)
+            
+            self:ParseWorldPartData(s_WorldPartData)
+        end
+
+        -- Get the mp soldier blueprint
+        if l_Instance:Is("SoldierBlueprint") then
+            local s_SoldierBlueprint = SoldierBlueprint(l_Instance)
+
+            self:ParseSoldierBlueprint(s_SoldierBlueprint)
+        end
+
+        -- Get the weapon unlocks
+        if l_Instance:Is("SoldierWeaponUnlockAsset") then
+            local s_WeaponUnlockAsset = SoldierWeaponUnlockAsset(l_Instance)
+
+            if self.m_Debug then
+                print("Unlock: " .. s_WeaponUnlockAsset.name)
+            end
+
+            table.insert(self.m_Unlocks, s_WeaponUnlockAsset)
+        end
+
+        -- Unlock assets for each team
+        if l_Instance:Is("VeniceSoldierCustomizationAsset") then
+            local s_CustomizationAsset = VeniceSoldierCustomizationAsset(l_Instance)
+
+            -- Get the asset name
+            local s_AssetName = s_CustomizationAsset.name
+
+            -- Check to see which team this is from
+            local s_IsUs = Utils.contains(s_AssetName, "/US")
+            local s_IsRu = Utils.contains(s_AssetName, "/RU")
+
+            if s_IsUs and s_IsRu then
+                print("Unlock cannot be us and ru...")
+            end
+
+            if not s_IsUs and not s_IsRu then
+                print("Unlock can not be neither US or RU.")
+            end
+
+            -- Add to the list
+            if s_IsUs then
+                table.insert(self.m_AttackerVeniceSoldierCustomizations, s_CustomizationAsset)
+            elseif s_IsRu then
+                table.insert(self.m_DefenceVeniceSoldierCustomizations, s_CustomizationAsset)
+            end
+        end
+        
+
+        ::__instance_cont__::
+    end
+end
+
 --[[
     Helper function which sends all clients the current hvt player id information
 
@@ -245,6 +377,9 @@ function HVTEngine:OnGameStateUpdate(p_DeltaTime)
                 self.m_TeamManager:SetupHVT()
 
                 -- TODO: Spawn everyone
+                if #self.m_SpawnPoints == 0 then
+                    print("there was an error, there are no spawn points.")
+                end
 
                 -- TODO: Give the HVT more health
 
